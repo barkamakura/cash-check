@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>釣り銭確認 - Bar KAMAKURA</title>
+<style>
+  :root{
+    --blue:#3d6e8c; --gold:#8a7454; --bg:#fffbe9; --card:#ffffff;
+    --text:#3a2f26; --sub:#7a6f60; --line:#e4dcc8;
+    --ok:#2f8f5b; --bad:#c0453c; --warn:#b8862f;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 18px 16px 60px; }
+  header { text-align: center; margin-bottom: 14px; }
+  header .logo { font-size: 13px; letter-spacing: 0.15em; color: var(--blue); font-weight: 700; }
+  header h1 { font-size: 20px; margin: 4px 0 0; color: var(--text); letter-spacing: 0.05em; }
+  .ver { position: fixed; top: 6px; right: 8px; font-size: 10px; color: var(--sub); font-family: Georgia, serif; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 16px 18px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card h2 { font-size: 14px; color: var(--blue); margin: 0 0 4px; letter-spacing: 0.08em; border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+  .card .h2-note { font-size: 11px; color: var(--sub); margin: 0 0 12px; }
+
+  .field { margin-bottom: 12px; }
+  .field label { display: block; font-size: 13px; color: var(--sub); margin-bottom: 4px; }
+  .field input[type="number"], .field input[type="date"] {
+    width: 100%; font-size: 20px; padding: 10px 10px; border: 1px solid var(--line);
+    border-radius: 8px; background: #fffef9; font-family: Georgia, serif; color: var(--text);
+  }
+  .field input[type="date"] { font-family: inherit; font-size: 15px; }
+  .yen-note { font-size: 11px; color: var(--sub); margin-top: 2px; }
+
+  .denom-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  .denom-table th { font-size: 11px; color: var(--sub); font-weight: 400; text-align: left; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  .denom-table th.num, .denom-table td.num { text-align: right; }
+  .denom-row td { padding: 7px 0; border-bottom: 1px dotted var(--line); vertical-align: middle; }
+  .denom-row .d-label { font-family: Georgia, serif; font-size: 15px; white-space: nowrap; padding-right: 8px; }
+  .denom-row input.d-count {
+    width: 62px; font-size: 16px; padding: 6px 6px; border: 1px solid var(--line);
+    border-radius: 6px; background: #fffef9; font-family: Georgia, serif; color: var(--text);
+    text-align: right;
+  }
+  .denom-row .d-unit { font-size: 11px; color: var(--sub); padding: 0 4px 0 3px; }
+  .denom-row .d-sub { font-family: Georgia, serif; font-size: 14px; white-space: nowrap; padding-left: 10px; }
+  .denom-total {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 10px 2px 2px; font-size: 14px;
+  }
+  .denom-total .lbl { color: var(--sub); }
+  .denom-total .val { font-family: Georgia, serif; font-size: 20px; font-weight: 700; color: var(--blue); }
+
+  .saved-tag { display:inline-block; font-size: 11px; color: var(--ok); margin-left: 6px; }
+
+  .result {
+    text-align: center; padding: 16px 10px; border-radius: 10px; margin-top: 4px;
+    background: #f4f1e6;
+  }
+  .result .label { font-size: 12px; color: var(--sub); letter-spacing: 0.1em; }
+  .result .amount { font-size: 30px; font-weight: 700; font-family: Georgia, serif; margin-top: 4px; }
+  .result .amount.ok   { color: var(--ok); }
+  .result .amount.bad  { color: var(--bad); }
+  .result .amount.wait { color: var(--sub); font-size: 16px; }
+  .result .sub { font-size: 12px; color: var(--sub); margin-top: 6px; }
+
+  button.primary {
+    width: 100%; padding: 13px; font-size: 15px; border: none; border-radius: 8px;
+    background: var(--blue); color: #fff; font-weight: 700; letter-spacing: 0.06em;
+    font-family: inherit; margin-top: 4px;
+  }
+  button.primary:active { opacity: 0.85; }
+
+  #save-alert {
+    display: none; position: sticky; top: 0; z-index: 20; margin: -4px -4px 12px;
+    padding: 8px 10px; border-radius: 8px; font-size: 12px; text-align: center;
+  }
+  #save-alert.show { display: block; }
+  #save-alert.err  { background: #fdeceb; color: var(--bad); border: 1px solid #f0c6c2; }
+  #save-alert.pending { background: #fff3e0; color: var(--warn); border: 1px solid #f0dcb0; }
+  #save-alert.ok { background: #eaf6ee; color: var(--ok); border: 1px solid #cfe9d8; }
+
+  .history-item {
+    padding: 9px 0; border-bottom: 1px dotted var(--line); font-size: 13px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-item .row1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .history-item .d { color: var(--sub); white-space: nowrap; }
+  .history-item .diff { font-family: Georgia, serif; font-weight: 700; white-space: nowrap; }
+  .history-item .diff.ok { color: var(--ok); }
+  .history-item .diff.bad { color: var(--bad); }
+  .history-item .diff.wait { color: var(--sub); font-weight: 400; }
+  .history-item .row2 { font-size: 11px; color: var(--sub); margin-top: 2px; }
+  .history-empty { color: var(--sub); font-size: 13px; text-align: center; padding: 10px 0; }
+</style>
+</head>
+<body>
+<div class="ver">v2</div>
+<div class="wrap">
+  <header>
+    <div class="logo">BAR KAMAKURA</div>
+    <h1>釣り銭確認</h1>
+  </header>
+
+  <div id="save-alert"></div>
+
+  <div class="card">
+    <div class="field" style="margin-bottom:0;">
+      <label for="f-date">営業日</label>
+      <input type="date" id="f-date">
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>営業前の釣り銭<span class="saved-tag" id="open-saved-tag" style="display:none;">✓ 保存済み</span></h2>
+    <div class="h2-note">開店時にレジにあった金額を、種類ごとに数えて入力してください</div>
+    <table class="denom-table" id="open-table"></table>
+    <div class="denom-total">
+      <span class="lbl">営業前の釣り銭 合計</span>
+      <span class="val" id="open-total">¥0</span>
+    </div>
+    <button class="primary" id="btn-save-open">営業前を保存</button>
+  </div>
+
+  <div class="card">
+    <h2>本日の現金売上<span class="saved-tag" id="cash-saved-tag" style="display:none;">✓ 保存済み</span></h2>
+    <div class="h2-note">売上記録アプリの「現金」の合計を入力してください</div>
+    <div class="field" style="margin-bottom:8px;">
+      <input type="number" id="f-cash" inputmode="numeric" placeholder="例: 82000">
+    </div>
+    <button class="primary" id="btn-save-cash">現金売上を保存</button>
+  </div>
+
+  <div class="card">
+    <h2>営業後の釣り銭(実際に数えた金額)<span class="saved-tag" id="close-saved-tag" style="display:none;">✓ 保存済み</span></h2>
+    <div class="h2-note">閉店後にレジを数えて、種類ごとに入力してください</div>
+    <table class="denom-table" id="close-table"></table>
+    <div class="denom-total">
+      <span class="lbl">営業後の釣り銭 合計</span>
+      <span class="val" id="close-total">¥0</span>
+    </div>
+    <button class="primary" id="btn-save-close">営業後を保存</button>
+  </div>
+
+  <div class="card">
+    <h2>現金会計の差異</h2>
+    <div class="result">
+      <div class="label">この日の差異</div>
+      <div class="amount" id="r-diff">¥0</div>
+      <div class="sub" id="r-detail">営業前・現金売上・営業後をすべて保存すると計算されます</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>これまでの記録</h2>
+    <div id="history"></div>
+    <div class="history-empty" id="history-empty" style="display:none;">まだ記録がありません</div>
+  </div>
+</div>
+
+<script>
+// ==================== 定数 ====================
+const OPEN_DENOMS  = [5000, 1000, 500, 100];
+const CLOSE_DENOMS = [10000, 5000, 1000, 500, 100, 50, 10];
+
+// ==================== Supabase 接続 ====================
+// 他のアプリ(値段確認・伝票・売上記録)と同じ場所を共有する。
+// key を "cash_check_YYYY-MM-DD" にして、日付ごとに1行(競合しない)。
+const SB_URL = "https://ygoenedypmqclgbcsgmo.supabase.co";
+const SB_KEY = "sb_publishable_0MKfDXkADPD2w7-Ewtz6MA_ineWsTMK";
+const SB_H = { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" };
+const KEY_PREFIX = "cash_check_";
+const BACKUP_KEY = "bk_cashcheck_backup_v2";
+
+async function sbGet(path) {
+  const r = await fetch(`${SB_URL}/rest/v1/${path}`, { headers: SB_H, cache: "no-store" });
+  if (!r.ok) throw new Error("読み込み失敗 " + r.status + " " + (await r.text()).slice(0, 120));
+  return r.json();
+}
+async function sbUpsert(table, rows, conflict) {
+  if (!rows || !rows.length) return;
+  const r = await fetch(`${SB_URL}/rest/v1/${table}?on_conflict=${conflict || "id"}`, {
+    method: "POST",
+    headers: { ...SB_H, Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(rows)
+  });
+  if (!r.ok) throw new Error("書き込み失敗 " + r.status + " " + (await r.text()).slice(0, 120));
+}
+
+function yen(n) {
+  n = Number(n) || 0;
+  return (n < 0 ? "-¥" : "¥") + Math.abs(n).toLocaleString();
+}
+function todayStr() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+function nowStr() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, "0");
+  return `${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function readLocalBackup() {
+  try { return JSON.parse(localStorage.getItem(BACKUP_KEY) || "{}"); } catch (e) { return {}; }
+}
+function writeLocalBackup(all) {
+  try { localStorage.setItem(BACKUP_KEY, JSON.stringify(all)); } catch (e) {}
+}
+
+let allEntries = {};   // { "2026-09-18": { open:{denoms,total,savedAt}, cash:{amount,savedAt}, close:{...} } }
+let currentDate = todayStr();
+
+// ==================== 金種行の描画 ====================
+function buildDenomTable(tableId, denoms) {
+  const table = document.getElementById(tableId);
+  table.innerHTML = `
+    <tr><th>金種</th><th class="num">枚数</th><th class="num">小計</th></tr>
+    ${denoms.map(d => `
+      <tr class="denom-row" data-denom="${d}">
+        <td class="d-label">¥${d.toLocaleString()}</td>
+        <td class="num"><input type="number" class="d-count" min="0" inputmode="numeric" value=""><span class="d-unit">枚</span></td>
+        <td class="num d-sub" data-sub="${d}">¥0</td>
+      </tr>
+    `).join("")}
+  `;
+  denoms.forEach(d => {
+    const input = table.querySelector(`tr[data-denom="${d}"] input.d-count`);
+    input.addEventListener("input", () => {
+      const count = Number(input.value) || 0;
+      table.querySelector(`[data-sub="${d}"]`).textContent = yen(d * count);
+      updateDenomTotal(tableId);
+      renderResult();
+    });
+  });
+}
+function readDenomCounts(tableId, denoms) {
+  const table = document.getElementById(tableId);
+  const counts = {};
+  denoms.forEach(d => {
+    const input = table.querySelector(`tr[data-denom="${d}"] input.d-count`);
+    counts[d] = Number(input.value) || 0;
+  });
+  return counts;
+}
+function writeDenomCounts(tableId, denoms, counts) {
+  const table = document.getElementById(tableId);
+  denoms.forEach(d => {
+    const input = table.querySelector(`tr[data-denom="${d}"] input.d-count`);
+    const c = counts && counts[d] != null ? counts[d] : "";
+    input.value = c === 0 ? 0 : (c || "");
+    table.querySelector(`[data-sub="${d}"]`).textContent = yen(d * (Number(c) || 0));
+  });
+  updateDenomTotal(tableId);
+}
+function totalOf(counts, denoms) {
+  return denoms.reduce((sum, d) => sum + d * (Number(counts[d]) || 0), 0);
+}
+function updateDenomTotal(tableId) {
+  const denoms = tableId === "open-table" ? OPEN_DENOMS : CLOSE_DENOMS;
+  const counts = readDenomCounts(tableId, denoms);
+  const total = totalOf(counts, denoms);
+  const totalEl = document.getElementById(tableId === "open-table" ? "open-total" : "close-total");
+  totalEl.textContent = yen(total);
+  return total;
+}
+
+// ==================== 計算・表示 ====================
+function calc(open, cash, close) {
+  const expected = open + cash;
+  const diff = close - expected;
+  return { expected, diff };
+}
+
+function renderResult() {
+  const entry = allEntries[currentDate] || {};
+  const openTotal = updateDenomTotal("open-table");
+  const closeTotal = updateDenomTotal("close-table");
+  const cashVal = document.getElementById("f-cash").value;
+
+  const box = document.getElementById("r-diff");
+  const detail = document.getElementById("r-detail");
+
+  const openReady = entry.open != null;
+  const closeReady = entry.close != null;
+  const cashReady = entry.cash != null;
+
+  if (!(openReady && cashReady && closeReady)) {
+    box.textContent = "―";
+    box.className = "amount wait";
+    const missing = [];
+    if (!openReady) missing.push("営業前");
+    if (!cashReady) missing.push("現金売上");
+    if (!closeReady) missing.push("営業後");
+    detail.textContent = `未保存: ${missing.join("・")}。3つとも保存すると差異が出ます`;
+    return;
+  }
+  const { expected, diff } = calc(entry.open.total, entry.cash.amount, entry.close.total);
+  box.textContent = yen(diff);
+  box.className = "amount " + (diff === 0 ? "ok" : "bad");
+  if (diff === 0) {
+    detail.textContent = `想定額 ${yen(expected)} とぴったり一致しています`;
+  } else if (diff > 0) {
+    detail.textContent = `想定額 ${yen(expected)} より ${yen(diff)} 多い(過剰)`;
+  } else {
+    detail.textContent = `想定額 ${yen(expected)} より ${yen(-diff)} 少ない(不足)`;
+  }
+}
+
+function renderHistory() {
+  const wrap = document.getElementById("history");
+  const empty = document.getElementById("history-empty");
+  const dates = Object.keys(allEntries).sort().reverse();
+  if (!dates.length) {
+    wrap.innerHTML = "";
+    empty.style.display = "block";
+    return;
+  }
+  empty.style.display = "none";
+  wrap.innerHTML = dates.slice(0, 60).map(d => {
+    const e = allEntries[d];
+    const openReady = e.open != null, closeReady = e.close != null, cashReady = e.cash != null;
+    let diffHtml, statusHtml = "";
+    if (openReady && cashReady && closeReady) {
+      const { diff } = calc(e.open.total, e.cash.amount, e.close.total);
+      const cls = diff === 0 ? "ok" : "bad";
+      const label = diff === 0 ? "一致" : (diff > 0 ? "過剰" : "不足");
+      diffHtml = `<span class="diff ${cls}">${yen(diff)}<span style="font-size:11px;color:var(--sub);font-weight:400;"> (${label})</span></span>`;
+    } else {
+      const missing = [];
+      if (!openReady) missing.push("営業前");
+      if (!cashReady) missing.push("現金売上");
+      if (!closeReady) missing.push("営業後");
+      diffHtml = `<span class="diff wait">未保存: ${missing.join("・")}</span>`;
+    }
+    return `<div class="history-item">
+      <div class="row1"><span class="d">${d}</span>${diffHtml}</div>
+    </div>`;
+  }).join("");
+}
+
+function showAlert(kind, text) {
+  const el = document.getElementById("save-alert");
+  el.className = "show " + kind;
+  el.textContent = text;
+}
+function hideAlert() {
+  const el = document.getElementById("save-alert");
+  el.className = "";
+  el.textContent = "";
+}
+
+function updateSavedTags() {
+  const entry = allEntries[currentDate] || {};
+  document.getElementById("open-saved-tag").style.display = entry.open ? "inline-block" : "none";
+  document.getElementById("cash-saved-tag").style.display = entry.cash ? "inline-block" : "none";
+  document.getElementById("close-saved-tag").style.display = entry.close ? "inline-block" : "none";
+}
+
+function loadDateIntoForm() {
+  const entry = allEntries[currentDate] || {};
+  writeDenomCounts("open-table", OPEN_DENOMS, entry.open ? entry.open.denoms : {});
+  writeDenomCounts("close-table", CLOSE_DENOMS, entry.close ? entry.close.denoms : {});
+  document.getElementById("f-cash").value = entry.cash ? entry.cash.amount : "";
+  updateSavedTags();
+  renderResult();
+}
+
+// ==================== 読み込み ====================
+async function loadAll() {
+  // まず端末の控えを表示(オフラインでも履歴が見える)
+  allEntries = readLocalBackup();
+  renderHistory();
+  loadDateIntoForm();
+  try {
+    const rows = await sbGet(`app_state?select=key,value&key=like.${KEY_PREFIX}*`);
+    const fromServer = {};
+    for (const row of rows) {
+      const d = row.key.slice(KEY_PREFIX.length);
+      fromServer[d] = row.value;
+    }
+    // サーバーの内容を優先しつつ、端末にしかない分(オフライン保存分)も残す
+    allEntries = { ...allEntries, ...fromServer };
+    writeLocalBackup(allEntries);
+    renderHistory();
+    loadDateIntoForm();
+    hideAlert();
+  } catch (e) {
+    showAlert("pending", "📶 サーバーに接続できません。この端末の記録だけ表示しています");
+  }
+}
+
+// ==================== 保存(営業前 / 現金売上 / 営業後 をそれぞれ独立保存) ====================
+async function fetchLatestEntryForDate(dateStr) {
+  // 他の端末が先にどこかを保存しているかもしれないので、保存前に最新を取りにいく
+  try {
+    const rows = await sbGet(`app_state?select=value&key=eq.${KEY_PREFIX}${dateStr}`);
+    if (rows && rows[0]) return rows[0].value;
+  } catch (e) { /* オフラインなら端末の控えのまま進む */ }
+  return allEntries[dateStr] || {};
+}
+
+async function saveSection(section, btnId, buildValue) {
+  const dateStr = document.getElementById("f-date").value || todayStr();
+  const btn = document.getElementById(btnId);
+  const originalLabel = btn.textContent;
+  btn.textContent = "保存中...";
+
+  const latest = await fetchLatestEntryForDate(dateStr);
+  const entry = { ...(allEntries[dateStr] || {}), ...latest };
+  entry[section] = buildValue();
+
+  allEntries[dateStr] = entry;
+  writeLocalBackup(allEntries);
+  if (dateStr === currentDate) { updateSavedTags(); renderResult(); }
+  renderHistory();
+
+  try {
+    await sbUpsert("app_state", [{ key: KEY_PREFIX + dateStr, value: entry }], "key");
+    hideAlert();
+  } catch (e) {
+    showAlert("pending", "📶 サーバーへ送れませんでした。この端末には保存済みです。あとでネットに繋がると自動で送り直します");
+  } finally {
+    btn.textContent = originalLabel;
+  }
+}
+
+function saveOpen() {
+  return saveSection("open", "btn-save-open", () => {
+    const denoms = readDenomCounts("open-table", OPEN_DENOMS);
+    return { denoms, total: totalOf(denoms, OPEN_DENOMS), savedAt: new Date().toISOString() };
+  });
+}
+function saveCash() {
+  return saveSection("cash", "btn-save-cash", () => {
+    const amount = Number(document.getElementById("f-cash").value) || 0;
+    return { amount, savedAt: new Date().toISOString() };
+  });
+}
+function saveClose() {
+  return saveSection("close", "btn-save-close", () => {
+    const denoms = readDenomCounts("close-table", CLOSE_DENOMS);
+    return { denoms, total: totalOf(denoms, CLOSE_DENOMS), savedAt: new Date().toISOString() };
+  });
+}
+
+// ==================== 初期化 ====================
+buildDenomTable("open-table", OPEN_DENOMS);
+buildDenomTable("close-table", CLOSE_DENOMS);
+
+document.getElementById("f-date").value = currentDate;
+document.getElementById("f-date").addEventListener("change", (e) => {
+  currentDate = e.target.value || todayStr();
+  loadDateIntoForm();
+});
+document.getElementById("f-cash").addEventListener("input", renderResult);
+document.getElementById("btn-save-open").addEventListener("click", saveOpen);
+document.getElementById("btn-save-cash").addEventListener("click", saveCash);
+document.getElementById("btn-save-close").addEventListener("click", saveClose);
+
+renderResult();
+loadAll();
+
+// 未送信分があれば再試行(オンライン復帰時)
+window.addEventListener("online", loadAll);
+</script>
+</body>
+</html>
